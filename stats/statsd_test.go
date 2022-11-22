@@ -30,7 +30,7 @@ func (s *statsdFakeServer) Addr() string {
 
 func (s *statsdFakeServer) Close() error {
 	if s.conn != nil {
-		return s.conn.Close() // nolint: wrapcheck
+		return s.conn.Close() //nolint: wrapcheck
 	}
 
 	return nil
@@ -186,7 +186,15 @@ func (suite *StatsdTestSuite) TestEventIPBlocklisted() {
 		mtglib.NewEventIPBlocklisted(net.ParseIP("10.0.0.10")))
 
 	time.Sleep(statsdSleepTime)
-	suite.Equal("mtg.ip_blocklisted:1|c", suite.statsdServer.String())
+	suite.Equal("mtg.ip_blocklisted:1|c|#ip_list:blocklist", suite.statsdServer.String())
+}
+
+func (suite *StatsdTestSuite) TestEventIPAllowlisted() {
+	suite.statsd.EventIPBlocklisted(
+		mtglib.NewEventIPAllowlisted(net.ParseIP("10.0.0.10")))
+
+	time.Sleep(statsdSleepTime)
+	suite.Equal("mtg.ip_blocklisted:1|c|#ip_list:allowlist", suite.statsdServer.String())
 }
 
 func (suite *StatsdTestSuite) TestEventReplayAttack() {
@@ -194,6 +202,22 @@ func (suite *StatsdTestSuite) TestEventReplayAttack() {
 
 	time.Sleep(statsdSleepTime)
 	suite.Equal("mtg.replay_attacks:1|c", suite.statsdServer.String())
+}
+
+func (suite *StatsdTestSuite) TestEventIPListSizeAllowlist() {
+	suite.statsd.EventIPListSize(mtglib.NewEventIPListSize(10, false))
+
+	time.Sleep(statsdSleepTime)
+	suite.Contains(suite.statsdServer.String(), "mtg.iplist_size:10|g")
+	suite.Contains(suite.statsdServer.String(), "allowlist")
+}
+
+func (suite *StatsdTestSuite) TestEventIPListSizeBlocklist() {
+	suite.statsd.EventIPListSize(mtglib.NewEventIPListSize(10, true))
+
+	time.Sleep(statsdSleepTime)
+	suite.Contains(suite.statsdServer.String(), "mtg.iplist_size:10|g")
+	suite.Contains(suite.statsdServer.String(), "blocklist")
 }
 
 func TestStatsd(t *testing.T) {

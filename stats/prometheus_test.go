@@ -25,16 +25,16 @@ type PrometheusTestSuite struct {
 func (suite *PrometheusTestSuite) Get() (string, error) {
 	addr := fmt.Sprintf("http://%s/", suite.httpListener.Addr().String())
 
-	resp, err := http.Get(addr) // nolint: noctx
+	resp, err := http.Get(addr) //nolint: noctx
 	if err != nil {
-		return "", err // nolint: wrapcheck
+		return "", err //nolint: wrapcheck
 	}
 
 	defer resp.Body.Close()
 
 	data, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return "", err // nolint: wrapcheck
+		return "", err //nolint: wrapcheck
 	}
 
 	return string(data), nil
@@ -45,7 +45,7 @@ func (suite *PrometheusTestSuite) SetupTest() {
 	suite.factory = stats.NewPrometheus("mtg", "/")
 	suite.prometheus = suite.factory.Make()
 
-	go suite.factory.Serve(suite.httpListener) // nolint: errcheck
+	go suite.factory.Serve(suite.httpListener) //nolint: errcheck
 }
 
 func (suite *PrometheusTestSuite) TearDownTest() {
@@ -156,7 +156,18 @@ func (suite *PrometheusTestSuite) TestEventIPBlocklisted() {
 
 	data, err := suite.Get()
 	suite.NoError(err)
-	suite.Contains(data, `mtg_ip_blocklisted 1`)
+	suite.Contains(data, `mtg_ip_blocklisted{ip_list="blocklist"} 1`)
+}
+
+func (suite *PrometheusTestSuite) TestEventIPAllowlisted() {
+	suite.prometheus.EventIPBlocklisted(
+		mtglib.NewEventIPAllowlisted(net.ParseIP("2001:db8::68")))
+
+	time.Sleep(100 * time.Millisecond)
+
+	data, err := suite.Get()
+	suite.NoError(err)
+	suite.Contains(data, `mtg_ip_blocklisted{ip_list="allowlist"} 1`)
 }
 
 func (suite *PrometheusTestSuite) TestEventReplayAttack() {
@@ -167,6 +178,18 @@ func (suite *PrometheusTestSuite) TestEventReplayAttack() {
 	data, err := suite.Get()
 	suite.NoError(err)
 	suite.Contains(data, `mtg_replay_attacks 1`)
+}
+
+func (suite *PrometheusTestSuite) TestEventIPListSize() {
+	suite.prometheus.EventIPListSize(mtglib.NewEventIPListSize(10, false))
+	suite.prometheus.EventIPListSize(mtglib.NewEventIPListSize(3, true))
+
+	time.Sleep(100 * time.Millisecond)
+
+	data, err := suite.Get()
+	suite.NoError(err)
+	suite.Contains(data, `mtg_iplist_size{ip_list="allowlist"} 10`)
+	suite.Contains(data, `mtg_iplist_size{ip_list="blocklist"} 3`)
 }
 
 func TestPrometheus(t *testing.T) {

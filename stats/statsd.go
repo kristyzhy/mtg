@@ -113,12 +113,26 @@ func (s statsdProcessor) EventConcurrencyLimited(_ mtglib.EventConcurrencyLimite
 	s.client.Incr(MetricConcurrencyLimited, 1)
 }
 
-func (s statsdProcessor) EventIPBlocklisted(_ mtglib.EventIPBlocklisted) {
-	s.client.Incr(MetricIPBlocklisted, 1)
+func (s statsdProcessor) EventIPBlocklisted(evt mtglib.EventIPBlocklisted) {
+	tag := TagIPListBlock
+	if !evt.IsBlockList {
+		tag = TagIPListAllow
+	}
+
+	s.client.Incr(MetricIPBlocklisted, 1, statsd.StringTag(TagIPList, tag))
 }
 
 func (s statsdProcessor) EventReplayAttack(_ mtglib.EventReplayAttack) {
 	s.client.Incr(MetricReplayAttacks, 1)
+}
+
+func (s statsdProcessor) EventIPListSize(evt mtglib.EventIPListSize) {
+	tag := TagIPListBlock
+	if !evt.IsBlockList {
+		tag = TagIPListAllow
+	}
+
+	s.client.Gauge(MetricIPListSize, int64(evt.Size), statsd.StringTag(TagIPList, tag))
 }
 
 func (s statsdProcessor) Shutdown() {
@@ -133,20 +147,20 @@ func (s statsdProcessor) Shutdown() {
 	}
 }
 
-// StatsdFactory is a factory of events.Observers which dumps
-// information to statsd.
+// StatsdFactory is a factory of [events.Observer] which dumps information to
+// statsd.
 //
-// Please beware that we support ONLY UDP endpoints there. And this
-// factory won't use mtglib.Network so it won't use a proxy if you
-// provide any. If you need it, I would recommend starting a local
-// statsd and route metrics further by features of the chosen server.
+// Please beware that we support ONLY UDP endpoints there. And this factory
+// won't use [mtglib.Network] so it won't use a proxy if you provide any. If
+// you need it, I would recommend starting a local statsd and route metrics
+// further by features of the chosen server.
 type StatsdFactory struct {
 	client *statsd.Client
 }
 
 // Close stops sending requests to statsd.
 func (s StatsdFactory) Close() error {
-	return s.client.Close() // nolint: wrapcheck
+	return s.client.Close() //nolint: wrapcheck
 }
 
 // Make build a new observer.
@@ -157,12 +171,12 @@ func (s StatsdFactory) Make() events.Observer {
 	}
 }
 
-// NewStatsd builds an events.ObserverFactory that sends events
-// to statsd.
+// NewStatsd builds an [events.ObserverFactory] that sends events to statsd.
 //
 // Valid tagFormats are 'datadog', 'influxdb' and 'graphite'.
 func NewStatsd(address string, log logger.StdLikeLogger,
-	metricPrefix, tagFormat string) (StatsdFactory, error) {
+	metricPrefix, tagFormat string,
+) (StatsdFactory, error) {
 	options := []statsd.Option{
 		statsd.MetricPrefix(metricPrefix),
 		statsd.Logger(log),

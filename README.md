@@ -1,6 +1,6 @@
 # mtg
 
-Highly-opionated (ex-bullshit-free) MTPROTO proxy for
+Highly-opinionated (ex-bullshit-free) MTPROTO proxy for
 [Telegram](https://telegram.org/).
 
 [![CI](https://github.com/9seconds/mtg/actions/workflows/ci.yaml/badge.svg?branch=master)](https://github.com/9seconds/mtg/actions/workflows/ci.yaml)
@@ -190,7 +190,7 @@ surprises. Always choose some version tag.
 Also, if you have `go` installed, you can always download this tool with `go get`:
 
 ```console
-go get github.com/9seconds/mtg/v2
+go install github.com/9seconds/mtg/v2@latest
 ```
 
 #### Build from sources
@@ -221,6 +221,16 @@ or
 
 ```console
 $ mtg generate-secret --hex google.com
+ee473ce5d4958eb5f968c87680a23854a0676f6f676c652e636f6d
+```
+
+equivalent commands with docker:
+
+```console
+$ docker run --rm nineseconds/mtg:2 generate-secret google.com
+7ibaERuTSGPH1RdztfYnN4tnb29nbGUuY29t
+
+$ docker run --rm nineseconds/mtg:2 generate-secret --hex google.com
 ee473ce5d4958eb5f968c87680a23854a0676f6f676c652e636f6d
 ```
 
@@ -307,12 +317,16 @@ Now you can create a systemd unit:
 ```console
 $ cat /etc/systemd/system/mtg.service
 [Unit]
-Description=mtg
+Description=mtg - MTProto proxy server
+Documentation=https://github.com/9seconds/mtg
+After=network.target
 
 [Service]
 ExecStart=/usr/local/bin/mtg run /etc/mtg.toml
 Restart=always
 RestartSec=3
+DynamicUser=true
+AmbientCapabilities=CAP_NET_BIND_SERVICE
 
 [Install]
 WantedBy=multi-user.target
@@ -324,7 +338,7 @@ $ sudo systemctl start mtg
 or you can run a docker image
 
 ```console
-docker run -d -v /etc/mtg.toml:/config.toml -p 443:3128 --restart=unless-stopped nineseconds/mtg:2
+docker run -d -v $PWD/config.toml:/config.toml -p 443:3128 --name mtg-proxy --restart=unless-stopped nineseconds/mtg:2
 ```
 
 where _443_ is a host port (a port you want to connect to from a
@@ -353,6 +367,12 @@ $ mtg access /etc/mtg.toml
 }
 ```
 
+or if you are using docker:
+
+```console
+$ docker exec mtg-proxy /mtg access /config.toml
+```
+
 ## Metrics
 
 Out of the box, mtg works with
@@ -367,11 +387,12 @@ Here goes a list of metrics with their types but without a prefix.
 | client_connections          | gauge   | `ip_family`                      | Count of processing client connections.                                                    |
 | telegram_connections        | gauge   | `telegram_ip`, `dc`              | Count of connections to Telegram servers.                                                  |
 | domain_fronting_connections | gauge   | `ip_family`                      | Count of connections to fronting domain.                                                   |
+| iplist_size                 | gauge   | `ip_list`                        | A size of either allowlist or blocklist in use.                                            |
 | telegram_traffic            | counter | `telegram_ip`, `dc`, `direction` | Count of bytes, transmitted to/from Telegram.                                              |
 | domain_fronting_traffic     | counter | `direction`                      | Count of bytes, transmitted to/from fronting domain.                                       |
 | domain_fronting             | counter | –                                | Count of domain fronting events.                                                           |
 | concurrency_limited         | counter | –                                | Count of events, when client connection was rejected due to concurrency limit.             |
-| ip_blocklisted              | counter | –                                | Count of events when client connection was rejected because IP was found in the blacklist. |
+| ip_blocklisted              | counter | `ip_list`                        | Count of events when client connection was rejected because IP was found in the blocklist. |
 | replay_attacks              | counter | –                                | Count of detected replay attacks.                                                          |
 
 Tag meaning:
@@ -382,3 +403,4 @@ Tag meaning:
 | dc          |                            | A number of the Telegram DC for a connection. |
 | telegram_ip |                            | IP address of the Telegram server.            |
 | direction   | `to_client`, `from_client` | A direction of the traffic flow.              |
+| ip_list     | `allowlist`, `blocklist`   | A type of the IP list.                        |

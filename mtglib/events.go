@@ -29,13 +29,13 @@ type EventStart struct {
 	RemoteIP net.IP
 }
 
-// EventConnectedToDC is emitted when mtg proxy has connected to a
-// Telegram server.
+// EventConnectedToDC is emitted when mtg proxy has connected to a Telegram
+// server.
 type EventConnectedToDC struct {
 	eventBase
 
-	// RemoteIP is an IP address of the Telegram server proxy has been
-	// connected to.
+	// RemoteIP is an IP address of the Telegram server proxy has been connected
+	// to.
 	RemoteIP net.IP
 
 	// DC is an index of the datacenter proxy has been connected to.
@@ -49,15 +49,15 @@ type EventTraffic struct {
 	// Traffic is a count of bytes which were transmitted.
 	Traffic uint
 
-	// IsRead defines if we _read_ or _write_ to connection. A rule of
-	// thumb is simple: EventTraffic is bound to a remote connection. Not
-	// to a client one, but either to Telegram or front domain one.
+	// IsRead defines if we _read_ or _write_ to connection. A rule of thumb is
+	// simple: EventTraffic is bound to a remote connection. Not to a client one,
+	// but either to Telegram or front domain one.
 	//
-	// In the case of Telegram, isRead means that we've fetched some bytes
-	// from Telegram to send it to a client.
+	// In the case of Telegram, isRead means that we've fetched some bytes from
+	// Telegram to send it to a client.
 	//
-	// In the case of the front domain, it means that we've fetched some
-	// bytes from this domain to send it to a client.
+	// In the case of the front domain, it means that we've fetched some bytes
+	// from this domain to send it to a client.
 	IsRead bool
 }
 
@@ -66,30 +66,40 @@ type EventFinish struct {
 	eventBase
 }
 
-// EventDomainFronting is emitted when we connect to a front domain
-// instead of Telegram server.
+// EventDomainFronting is emitted when we connect to a front domain instead of
+// Telegram server.
 type EventDomainFronting struct {
 	eventBase
 }
 
-// EventConcurrencyLimited is emitted when connection was declined
-// because of the concurrency limit of the worker pool.
+// EventConcurrencyLimited is emitted when connection was declined because of
+// the concurrency limit of the worker pool.
 type EventConcurrencyLimited struct {
 	eventBase
 }
 
-// EventIPBlocklisted is emitted when connection was declined because
-// IP address was found in IP blocklist.
+// EventIPBlocklisted is emitted when connection was declined because IP
+// address was found in IP blocklist.
 type EventIPBlocklisted struct {
 	eventBase
 
-	RemoteIP net.IP
+	RemoteIP    net.IP
+	IsBlockList bool
 }
 
 // EventReplayAttack is emitted when mtg detects a replay attack on a
 // connection.
 type EventReplayAttack struct {
 	eventBase
+}
+
+// EventIPListSize is emitted when mtg updates a contents of the ip lists:
+// allowlist or blocklist.
+type EventIPListSize struct {
+	eventBase
+
+	Size        int
+	IsBlockList bool
 }
 
 // NewEventStart creates a new EventStart event.
@@ -163,7 +173,20 @@ func NewEventIPBlocklisted(remoteIP net.IP) EventIPBlocklisted {
 		eventBase: eventBase{
 			timestamp: time.Now(),
 		},
-		RemoteIP: remoteIP,
+		RemoteIP:    remoteIP,
+		IsBlockList: true,
+	}
+}
+
+// NewEventIPAllowlisted creates a NewEventIPBlocklisted event with a mark that
+// it is supposed to be for allow list.
+func NewEventIPAllowlisted(remoteIP net.IP) EventIPBlocklisted {
+	return EventIPBlocklisted{
+		eventBase: eventBase{
+			timestamp: time.Now(),
+		},
+		RemoteIP:    remoteIP,
+		IsBlockList: false,
 	}
 }
 
@@ -174,5 +197,16 @@ func NewEventReplayAttack(streamID string) EventReplayAttack {
 			timestamp: time.Now(),
 			streamID:  streamID,
 		},
+	}
+}
+
+// NewEventIPListSize creates a new EventIPListSize event.
+func NewEventIPListSize(size int, isBlockList bool) EventIPListSize {
+	return EventIPListSize{
+		eventBase: eventBase{
+			timestamp: time.Now(),
+		},
+		Size:        size,
+		IsBlockList: isBlockList,
 	}
 }

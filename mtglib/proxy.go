@@ -34,7 +34,7 @@ type Proxy struct {
 	network         Network
 	antiReplayCache AntiReplayCache
 	blocklist       IPBlocklist
-	whitelist       IPBlocklist
+	allowlist       IPBlocklist
 	eventStream     EventStream
 	logger          Logger
 }
@@ -44,8 +44,8 @@ func (p *Proxy) DomainFrontingAddress() string {
 	return net.JoinHostPort(p.secret.Host, strconv.Itoa(p.domainFrontingPort))
 }
 
-// ServeConn serves a connection. We do not check IP blocklist and
-// concurrency limit here.
+// ServeConn serves a connection. We do not check IP blocklist and concurrency
+// limit here.
 func (p *Proxy) ServeConn(conn essentials.Conn) {
 	p.streamWaitGroup.Add(1)
 	defer p.streamWaitGroup.Done()
@@ -91,7 +91,7 @@ func (p *Proxy) ServeConn(conn essentials.Conn) {
 }
 
 // Serve starts a proxy on a given listener.
-func (p *Proxy) Serve(listener net.Listener) error { // nolint: cyclop
+func (p *Proxy) Serve(listener net.Listener) error {
 	p.streamWaitGroup.Add(1)
 	defer p.streamWaitGroup.Done()
 
@@ -106,13 +106,13 @@ func (p *Proxy) Serve(listener net.Listener) error { // nolint: cyclop
 			}
 		}
 
-		ipAddr := conn.RemoteAddr().(*net.TCPAddr).IP
+		ipAddr := conn.RemoteAddr().(*net.TCPAddr).IP //nolint: forcetypeassert
 		logger := p.logger.BindStr("ip", ipAddr.String())
 
-		if p.whitelist != nil && !p.whitelist.Contains(ipAddr) {
+		if !p.allowlist.Contains(ipAddr) {
 			conn.Close()
-			logger.Info("ip was rejected by whitelist")
-			p.eventStream.Send(p.ctx, NewEventIPBlocklisted(ipAddr))
+			logger.Info("ip was rejected by allowlist")
+			p.eventStream.Send(p.ctx, NewEventIPAllowlisted(ipAddr))
 
 			continue
 		}
@@ -138,12 +138,15 @@ func (p *Proxy) Serve(listener net.Listener) error { // nolint: cyclop
 	}
 }
 
-// Shutdown 'gracefully' shutdowns all connections. Please remember that
-// it does not close an underlying listener.
+// Shutdown 'gracefully' shutdowns all connections. Please remember that it
+// does not close an underlying listener.
 func (p *Proxy) Shutdown() {
 	p.ctxCancel()
 	p.streamWaitGroup.Wait()
 	p.workerPool.Release()
+
+	p.allowlist.Shutdown()
+	p.blocklist.Shutdown()
 }
 
 func (p *Proxy) doFakeTLSHandshake(ctx *streamContext) bool {
@@ -249,7 +252,10 @@ func (p *Proxy) doTelegramCall(ctx *streamContext) error {
 	}
 
 	p.eventStream.Send(ctx,
-		NewEventConnectedToDC(ctx.streamID, conn.RemoteAddr().(*net.TCPAddr).IP, ctx.dc))
+		NewEventConnectedToDC(ctx.streamID,
+			conn.RemoteAddr().(*net.TCPAddr).IP, //nolint: forcetypeassert
+			ctx.dc),
+	)
 
 	return nil
 }
@@ -299,7 +305,7 @@ func NewProxy(opts ProxyOpts) (*Proxy, error) {
 		network:                  opts.Network,
 		antiReplayCache:          opts.AntiReplayCache,
 		blocklist:                opts.IPBlocklist,
-		whitelist:                opts.IPWhitelist,
+		allowlist:                opts.IPAllowlist,
 		eventStream:              opts.EventStream,
 		logger:                   opts.getLogger("proxy"),
 		domainFrontingPort:       opts.getDomainFrontingPort(),
@@ -310,7 +316,7 @@ func NewProxy(opts ProxyOpts) (*Proxy, error) {
 
 	pool, err := ants.NewPoolWithFunc(opts.getConcurrency(),
 		func(arg interface{}) {
-			proxy.ServeConn(arg.(essentials.Conn))
+			proxy.ServeConn(arg.(essentials.Conn)) //nolint: forcetypeassert
 		},
 		ants.WithLogger(opts.getLogger("ants")),
 		ants.WithNonblocking(true))

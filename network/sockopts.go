@@ -10,20 +10,16 @@ import (
 //
 // bufferSize setting is deprecated and ignored.
 func SetClientSocketOptions(conn net.Conn, bufferSize int) error {
-	return setCommonSocketOptions(conn.(*net.TCPConn))
+	return setCommonSocketOptions(conn.(*net.TCPConn)) //nolint: forcetypeassert
 }
 
 // SetServerSocketOptions tunes a TCP socket that represents a connection to
 // remote server like Telegram or fronting domain (but not end user).
 func SetServerSocketOptions(conn net.Conn, bufferSize int) error {
-	return setCommonSocketOptions(conn.(*net.TCPConn))
+	return setCommonSocketOptions(conn.(*net.TCPConn)) //nolint: forcetypeassert
 }
 
 func setCommonSocketOptions(conn *net.TCPConn) error {
-	if err := conn.SetKeepAlive(true); err != nil {
-		return fmt.Errorf("cannot disable TCP keepalive probes: %w", err)
-	}
-
 	if err := conn.SetKeepAlivePeriod(DefaultTCPKeepAlivePeriod); err != nil {
 		return fmt.Errorf("cannot set time period of TCP keepalive probes: %w", err)
 	}

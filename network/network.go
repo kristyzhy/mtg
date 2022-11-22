@@ -21,7 +21,7 @@ type networkHTTPTransport struct {
 func (n networkHTTPTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 	req.Header.Set("User-Agent", n.userAgent)
 
-	return n.next.RoundTrip(req) // nolint: wrapcheck
+	return n.next.RoundTrip(req) //nolint: wrapcheck
 }
 
 type network struct {
@@ -61,7 +61,8 @@ func (n *network) DialContext(ctx context.Context, protocol, address string) (es
 }
 
 func (n *network) MakeHTTPClient(dialFunc func(ctx context.Context,
-	network, address string) (essentials.Conn, error)) *http.Client {
+	network, address string) (essentials.Conn, error),
+) *http.Client {
 	if dialFunc == nil {
 		dialFunc = n.DialContext
 	}
@@ -117,13 +118,14 @@ func (n *network) dnsResolve(protocol, address string) ([]string, error) {
 	return ips, nil
 }
 
-// NewNetwork assembles an mtglib.Network compatible structure
-// based on a dialer and given params.
+// NewNetwork assembles an mtglib.Network compatible structure based on a
+// dialer and given params.
 //
 // It brings simple DNS cache and DNS-Over-HTTPS when necessary.
 func NewNetwork(dialer Dialer,
 	userAgent, dohHostname string,
-	httpTimeout time.Duration) (mtglib.Network, error) {
+	httpTimeout time.Duration,
+) (mtglib.Network, error) {
 	switch {
 	case httpTimeout < 0:
 		return nil, fmt.Errorf("timeout should be positive number %s", httpTimeout)
@@ -146,7 +148,8 @@ func NewNetwork(dialer Dialer,
 
 func makeHTTPClient(userAgent string,
 	timeout time.Duration,
-	dialFunc func(ctx context.Context, network, address string) (essentials.Conn, error)) *http.Client {
+	dialFunc func(ctx context.Context, network, address string) (essentials.Conn, error),
+) *http.Client {
 	return &http.Client{
 		Timeout: timeout,
 		Transport: networkHTTPTransport{
